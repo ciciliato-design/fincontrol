@@ -225,9 +225,11 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 
   <!-- TOPBAR -->
   <div class="topbar">
-    <div class="topbar-brand">
+    <div class="topbar-brand" style="cursor:pointer" onclick="syncPull()" title="Sincronizar com Google Sheets">
       <span class="topbar-title">FinControl</span>
-      <span class="topbar-sub" id="syncStatus">Controle Financeiro 2026</span>
+      <span id="syncInd" style="font-size:11px;display:flex;align-items:center;gap:4px;color:var(--txt2);margin-top:1px">
+        <i class="ti ti-cloud" style="font-size:14px"></i><span>Toque para sincronizar</span>
+      </span>
     </div>
     <div style="display:flex;align-items:center;gap:6px">
       <button onclick="showTab('cadastro',null)" class="topbar-icon-btn" aria-label="Cadastro"><i class="ti ti-settings-2"></i></button>
@@ -444,6 +446,25 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       <!-- Sub 4: Configurações -->
       <div id="subcad-4" style="display:none">
         <div class="sec">
+          <!-- Google Sheets Sync -->
+          <div class="sec-title" style="margin-bottom:14px"><i class="ti ti-brand-google"></i>Google Sheets</div>
+          <div style="background:var(--blue-bg);border-radius:12px;padding:12px 14px;margin-bottom:14px;font-size:13px;color:var(--blue);line-height:1.5">
+            <b>Como configurar:</b><br>
+            1. Abra a planilha → <b>Extensões → Apps Script</b><br>
+            2. Cole o código do arquivo <b>Code.gs</b><br>
+            3. <b>Implantar → Nova implantação → Aplicativo Web</b><br>
+            4. Executar como: <i>Eu mesmo</i> · Acesso: <i>Qualquer pessoa</i><br>
+            5. Cole a URL abaixo e toque em Salvar
+          </div>
+          <div class="field">
+            <label>URL do Apps Script</label>
+            <input type="text" id="cfg-script-url" placeholder="https://script.google.com/macros/s/..." style="font-size:13px"/>
+          </div>
+          <div class="g2" style="margin-bottom:14px">
+            <button class="btn-p" onclick="salvarScriptUrl()"><i class="ti ti-check"></i> Salvar URL</button>
+            <button class="btn-s" onclick="syncPull()"><i class="ti ti-refresh"></i> Sincronizar agora</button>
+          </div>
+          <div class="divider"></div>
           <div class="sec-title" style="margin-bottom:14px"><i class="ti ti-settings"></i>Configurações</div>
           <div class="cfg-row">
             <div>
@@ -631,12 +652,15 @@ let despFilter = 'todas';
 let importData = [];
 let charts = {};
 
-const K_TX = 'fc26_transactions';
-const K_CF = 'fc26_config';
+const K_TX   = 'fc26_transactions';
+const K_CF   = 'fc26_config';
+const K_SURL = 'fc26_scripturl';
+const K_SYNC = 'fc26_lastsync';
 
 let transactions = [];
 let config = {
   limite: 0,
+  scriptUrl: '',
   tiposDespesa: ['Casa','Saúde','Alimentação','Educação','Carro','Lazer','Vestuário','Saúde Mental','Diversos'],
   tiposReceita: ['Salário','Adiantamento','13° Salário','Freelance','Outros'],
   origensPagemento: ['PIX','Dinheiro','Débito','Cartão Crédito','Vale Alimentação','Folha de Pgto','Boleto']
@@ -655,6 +679,72 @@ function loadData() {
 }
 
 function saveData() {
+  localStorage.setItem(K_TX, JSON.stringify(transactions));
+  localStorage.setItem(K_CF, JSON.stringify(config));
+  // push to sheets if configured (debounced)
+  clearTimeout(saveData._t);
+  saveData._t = setTimeout(syncPush, 1500);
+}
+
+// ═══════════════════════════════════════════════
+// GOOGLE SHEETS SYNC
+// ═══════════════════════════════════════════════
+function getScriptUrl() { return config.scriptUrl || localStorage.getItem(K_SURL) || ''; }
+
+function setSyncUI(state, msg) {
+  const el = document.getElementById('syncInd');
+  if (!el) return;
+  const icons = { idle:'ti-cloud', syncing:'ti-refresh', ok:'ti-cloud-check', error:'ti-cloud-x' };
+  const colors = { idle:'var(--txt2)', syncing:'var(--blue)', ok:'var(--green)', error:'var(--red)' };
+  el.innerHTML = `<i class="ti ${icons[state]||'ti-cloud'}" style="font-size:15px;${state==='syncing'?'animation:spin .8s linear infinite':''}"></i><span>${msg}</span>`;
+  el.style.color = colors[state] || 'var(--txt2)';
+}
+
+async function syncPull() {
+  const url = getScriptUrl();
+  if (!url) { setSyncUI('idle','Sem sync'); return; }
+  setSyncUI('syncing','Sincronizando…');
+  try {
+    const res = await fetch(url + '?action=read', { method:'GET' });
+    const json = await res.json();
+    if (!json.ok) throw new Error(json.error || 'Erro na leitura');
+    if (json.transactions && json.transactions.length > 0) {
+      // Merge: planilha é a fonte da verdade no pull inicial
+      transactions = json.transactions;
+      saveDataLocal();
+      renderAll();
+    }
+    const t = new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+    localStorage.setItem(K_SYNC, t);
+    setSyncUI('ok', 'Sync ' + t);
+  } catch(e) {
+    console.error('syncPull:', e);
+    setSyncUI('error', 'Erro sync');
+  }
+}
+
+async function syncPush() {
+  const url = getScriptUrl();
+  if (!url) return;
+  setSyncUI('syncing','Salvando…');
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      body: JSON.stringify({ action:'write', transactions }),
+      headers: { 'Content-Type':'application/json' }
+    });
+    const json = await res.json();
+    if (!json.ok) throw new Error(json.error || 'Erro na escrita');
+    const t = new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+    localStorage.setItem(K_SYNC, t);
+    setSyncUI('ok', 'Salvo ' + t);
+  } catch(e) {
+    console.error('syncPush:', e);
+    setSyncUI('error', 'Erro ao salvar');
+  }
+}
+
+function saveDataLocal() {
   localStorage.setItem(K_TX, JSON.stringify(transactions));
   localStorage.setItem(K_CF, JSON.stringify(config));
 }
@@ -1132,6 +1222,8 @@ function renderCadSub(idx) {
   else if (idx===4) {
     const cfgEl = document.getElementById('cfg-limite');
     if (cfgEl) cfgEl.value = config.limite||'';
+    const urlEl = document.getElementById('cfg-script-url');
+    if (urlEl) urlEl.value = config.scriptUrl || localStorage.getItem(K_SURL) || '';
   }
 }
 
@@ -1199,9 +1291,24 @@ function renderEditList() {
     </div>`).join('');
 }
 
+function salvarScriptUrl() {
+  const url = (document.getElementById('cfg-script-url').value || '').trim();
+  config.scriptUrl = url;
+  localStorage.setItem(K_SURL, url);
+  saveData();
+  if (url) {
+    setSyncUI('idle', 'URL salva — sincronizando…');
+    syncPull();
+  } else {
+    setSyncUI('idle', 'Sem sync');
+    alert('URL removida.');
+  }
+}
+
 function salvarConfig() {
   config.limite = parseFloat(document.getElementById('cfg-limite').value)||0;
-  saveData();
+  saveDataLocal();
+  syncPush();
   alert('Configurações salvas!');
   renderDashboard();
 }
@@ -1403,53 +1510,126 @@ function parseImport() {
 }
 
 function parseCSVBank(text, banco) {
-  const lines=text.split(/\r?\n/).map(l=>l.trim()).filter(l=>l);
-  const result=[];
-  let startLine=0;
-
-  // Skip header lines that don't look like data
-  for(let i=0;i<Math.min(5,lines.length);i++){
-    if(/\d{2}[\/\-]\d{2}[\/\-]\d{4}|\d{4}[\/\-]\d{2}[\/\-]\d{2}/.test(lines[i])){startLine=i;break;}
-    if(i>0&&lines[i].split(/[,;]/).length>=2) startLine=i+1;
+  // C6 Bank: colunas fixas conhecidas
+  if (banco === 'c6' || text.includes('C6 BANK') || text.includes('Entrada(R$)')) {
+    return parseC6(text);
   }
 
-  for(let i=startLine;i<lines.length;i++){
-    const line=lines[i];
-    const sep=line.includes(';')?';':',';
-    const cols=line.split(sep).map(c=>c.replace(/^"|"$/g,'').trim());
-    if(cols.length<2) continue;
+  // Parser generico (Nubank, Inter, Itau...)
+  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l);
+  const result = [];
+  let startLine = 0;
+  const dateRx = /^\d{2}[\/\-]\d{2}[\/\-]\d{4}$|^\d{4}[\/\-]\d{2}[\/\-]\d{2}$/;
 
-    let date=null,desc='',value=0,typeHint=null;
+  for (let i = 0; i < Math.min(10, lines.length); i++) {
+    if (dateRx.test(lines[i].split(/[,;]/)[0].trim())) { startLine = i; break; }
+    if (i > 0 && lines[i].split(/[,;]/).length >= 3) startLine = i + 1;
+  }
 
-    for(let j=0;j<cols.length;j++){
-      const col=cols[j];
-      // Date detection
-      if(!date){
-        const dm=col.match(/^(\d{2})[\/\-](\d{2})[\/\-](\d{4})$/);
-        const dm2=col.match(/^(\d{4})[\/\-](\d{2})[\/\-](\d{2})$/);
-        if(dm) date=`${dm[3]}-${dm[2].padStart(2,'0')}-${dm[1].padStart(2,'0')}`;
-        else if(dm2) date=`${dm2[1]}-${dm2[2].padStart(2,'0')}-${dm2[3].padStart(2,'0')}`;
+  for (let i = startLine; i < lines.length; i++) {
+    const line = lines[i];
+    const sep  = line.includes(';') ? ';' : ',';
+    const cols = splitCSVLine(line, sep);
+    if (cols.length < 2) continue;
+
+    let date = null, desc = '', value = 0, typeHint = null;
+    const usedAsDate = new Set();
+
+    for (let j = 0; j < cols.length; j++) {
+      const col = cols[j].trim();
+      if (!date) {
+        const dm  = col.match(/^(\d{2})[\/\-](\d{2})[\/\-](\d{4})$/);
+        const dm2 = col.match(/^(\d{4})[\/\-](\d{2})[\/\-](\d{2})$/);
+        if (dm)  { date = `${dm[3]}-${dm[2].padStart(2,'0')}-${dm[1].padStart(2,'0')}`; usedAsDate.add(j); }
+        else if (dm2) { date = `${dm2[1]}-${dm2[2].padStart(2,'0')}-${dm2[3].padStart(2,'0')}`; usedAsDate.add(j); }
+      } else if (dateRx.test(col)) { usedAsDate.add(j); continue; }
+
+      if (!desc && col.length > 3 && isNaN(parseFloat(col.replace(',', '.')))) desc = col;
+
+      if (!value && !usedAsDate.has(j)) {
+        const v = parseFloat(col.replace(/\./g, '').replace(',', '.').replace(/[^\d.\-]/g, ''));
+        if (!isNaN(v) && Math.abs(v) > 0.01) value = v;
       }
-      // Description
-      if(!desc&&col.length>3&&isNaN(parseFloat(col.replace(',','.')))) desc=col;
-      // Value
-      if(!value){
-        const v=parseFloat(col.replace(/\./g,'').replace(',','.').replace(/[^\d\.\-]/g,''));
-        if(!isNaN(v)&&Math.abs(v)>0.01) value=v;
-      }
-      // Type hints
-      if(col.toLowerCase().includes('crédito')||col.toLowerCase().includes('entrada')) typeHint='receita';
-      if(col.toLowerCase().includes('débito')||col.toLowerCase().includes('saída')||col.toLowerCase().includes('pagamento')) typeHint='despesa';
+
+      const cl = col.toLowerCase();
+      if (cl.includes('cr\u00e9dito') || cl.includes('entrada') || cl.includes('recebido')) typeHint = 'receita';
+      if (cl.includes('d\u00e9bito')  || cl.includes('sa\u00edda') || cl.includes('pagamento') || cl.includes('enviado')) typeHint = 'despesa';
     }
 
-    if(date&&Math.abs(value)>0.01){
-      const type=typeHint||(value<0?'despesa':'receita');
-      result.push({date,description:desc,value:Math.abs(value),type});
+    if (date && Math.abs(value) > 0.01) {
+      const type = typeHint || (value < 0 ? 'despesa' : 'receita');
+      result.push({ date, description: desc, value: Math.abs(value), type });
     }
   }
   return result;
 }
 
+// Parser dedicado C6 Bank
+// Colunas: Data Lancamento, Data Contabil, Titulo, Descricao, Entrada(R$), Saida(R$), Saldo do Dia(R$)
+function parseC6(text) {
+  const lines  = text.split(/\r?\n/).map(l => l.trim());
+  const result = [];
+  let headerIdx = -1;
+  for (let i = 0; i < lines.length; i++) {
+    const ll = lines[i].toLowerCase();
+    if (ll.includes('data lan') || (ll.includes('entrada') && ll.includes('sa'))) { headerIdx = i; break; }
+  }
+  const startIdx = headerIdx >= 0 ? headerIdx + 1 : 0;
+
+  for (let i = startIdx; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+    const sep  = line.includes(';') ? ';' : ',';
+    const cols = splitCSVLine(line, sep);
+    if (cols.length < 6) continue;
+
+    const dm = cols[0].trim().match(/^(\d{2})[\/\-](\d{2})[\/\-](\d{4})$/);
+    if (!dm) continue;
+    const date = `${dm[3]}-${dm[2].padStart(2,'0')}-${dm[1].padStart(2,'0')}`;
+
+    const titulo = cols[2].trim().replace(/^"|"$/g, '').trim();
+    const descri = cols[3].trim().replace(/^"|"$/g, '').trim();
+    const description = titulo || descri;
+
+    const entrada = parseValorBR(cols[4]);
+    const saida   = parseValorBR(cols[5]);
+
+    if (entrada > 0.01) {
+      result.push({ date, description, value: entrada, type: 'receita' });
+    } else if (saida > 0.01) {
+      result.push({ date, description, value: saida, type: 'despesa' });
+    }
+  }
+  return result;
+}
+
+function parseValorBR(str) {
+  if (!str) return 0;
+  const s = str.replace(/^"|"$/g, '').trim();
+  if (!s || s === '0.00' || s === '0,00' || s === '0') return 0;
+  let v;
+  if (s.includes(',')) {
+    // Formato BR: 1.234,56 → remover ponto milhar, trocar virgula por ponto
+    v = parseFloat(s.replace(/\./g, '').replace(',', '.').replace(/[^\d.\-]/g, ''));
+  } else {
+    // Formato US: 1234.56 → parsear direto
+    v = parseFloat(s.replace(/[^\d.\-]/g, ''));
+  }
+  return isNaN(v) ? 0 : Math.abs(v);
+}
+
+function splitCSVLine(line, sep) {
+  const cols = [];
+  let cur = '', inQ = false;
+  for (let k = 0; k < line.length; k++) {
+    const ch = line[k];
+    if (ch === '"') { inQ = !inQ; }
+    else if (ch === sep && !inQ) { cols.push(cur); cur = ''; }
+    else { cur += ch; }
+  }
+  cols.push(cur);
+  return cols;
+}
 function parseOFX(text) {
   const result=[];
   const stmts=text.match(/<STMTTRN>([\s\S]*?)<\/STMTTRN>/gi)||[];
@@ -1542,6 +1722,16 @@ function renderAll() {
   document.getElementById('r-data').value = today();
   populateRecSelects();
   renderAll();
+  // Sync on load
+  const url = config.scriptUrl || localStorage.getItem(K_SURL) || '';
+  if (url) {
+    config.scriptUrl = url;
+    const last = localStorage.getItem(K_SYNC);
+    setSyncUI('idle', last ? 'Último sync: ' + last : 'Conectado');
+    syncPull();
+  } else {
+    setSyncUI('idle', 'Configurar sync →');
+  }
 })();
 </script>
 </body>
