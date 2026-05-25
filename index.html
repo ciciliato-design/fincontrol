@@ -112,7 +112,8 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 /* ── Badges ── */
 .badge{font-size:11px;padding:3px 8px;border-radius:20px;white-space:nowrap;font-weight:700}
 .badge-pago{background:var(--green-bg);color:var(--green)}
-.badge-pendente{background:var(--red-bg);color:var(--red)}
+.badge-pendente{background:#FEF3C7;color:#92400E}
+.badge-vencida{background:var(--red-bg);color:var(--red)}
 .badge-futuro{background:var(--amber-bg);color:var(--amber)}
 .pill{font-size:10px;padding:2px 7px;border-radius:20px;background:var(--amber-bg);color:var(--amber);margin-left:3px;font-weight:600}
 .pill-rec{background:var(--blue-bg);color:var(--blue)}
@@ -130,7 +131,8 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 .act-row{display:flex;gap:0;margin-top:2px}
 /* Status stripe */
 .stripe-pago{border-left:3px solid var(--green);padding-left:10px}
-.stripe-pendente{border-left:3px solid var(--red);padding-left:10px}
+.stripe-pendente{border-left:3px solid var(--amber);padding-left:10px}
+.stripe-vencida{border-left:3px solid var(--red);padding-left:10px}
 .stripe-futuro{border-left:3px solid var(--amber);padding-left:10px}
 
 /* ── Alert ── */
@@ -145,7 +147,8 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 .chip:active{transform:scale(.93)}
 .chip.active{background:var(--blue);border-color:var(--blue);color:#fff;box-shadow:0 4px 12px rgba(24,95,165,.35)}
 .chip.chip-pago.active{background:var(--green);border-color:var(--green);box-shadow:0 4px 12px rgba(10,102,64,.3)}
-.chip.chip-pendente.active{background:var(--red);border-color:var(--red);box-shadow:0 4px 12px rgba(185,28,28,.3)}
+.chip.chip-pendente.active{background:var(--amber);border-color:var(--amber);box-shadow:0 4px 12px rgba(146,64,14,.3)}
+.chip.chip-vencida.active{background:var(--red);border-color:var(--red);box-shadow:0 4px 12px rgba(185,28,28,.3)}
 .chip.chip-futuro.active{background:var(--amber);border-color:var(--amber);box-shadow:0 4px 12px rgba(146,64,14,.3)}
 
 /* ── Date filter ── */
@@ -264,20 +267,29 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
           <div class="card-sub" id="d-pago-ct"></div>
         </div>
         <div class="card">
-          <div class="card-label" style="color:var(--red)">🔴 A Pagar</div>
-          <div class="card-value red" id="d-apagar">R$ 0,00</div>
+          <div class="card-label" style="color:var(--amber)">🟡 A Pagar</div>
+          <div class="card-value amber" id="d-apagar">R$ 0,00</div>
           <div class="card-sub" id="d-apagar-ct"></div>
         </div>
         <div class="card">
-          <div class="card-label" style="color:var(--amber)">🟡 Futuro</div>
-          <div class="card-value amber" id="d-pendente">R$ 0,00</div>
+          <div class="card-label" style="color:var(--red)">🔴 Pendente</div>
+          <div class="card-value red" id="d-pendente">R$ 0,00</div>
           <div class="card-sub" id="d-pendente-ct"></div>
         </div>
         <div class="card">
-          <div class="card-label">💰 Comprometido</div>
-          <div class="card-value" id="d-comprometido" style="color:var(--blue)">R$ 0,00</div>
-          <div class="card-sub">Saldo - tudo lançado</div>
+          <div class="card-label" style="color:var(--amber)">💸 Juros Pagas</div>
+          <div class="card-value amber" id="d-comprometido">R$ 0,00</div>
+          <div class="card-sub" id="d-comprometido-ct">Total de juros/multas</div>
         </div>
+      </div>
+
+      <!-- Filtro de data do dashboard -->
+      <div class="date-filter" style="margin-bottom:4px">
+        <label>De</label>
+        <input type="date" id="dash-de" onchange="renderDashboard()"/>
+        <label>Até</label>
+        <input type="date" id="dash-ate" onchange="renderDashboard()"/>
+        <button class="btn-icon" onclick="clearDashFilter()" title="Limpar filtro"><i class="ti ti-x" style="font-size:16px"></i></button>
       </div>
 
       <!-- Receita vs Despesa do mês -->
@@ -291,9 +303,13 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
           <span style="color:var(--txt2)">Despesas pagas</span>
           <span class="red" id="d-desp-mes" style="font-weight:800">R$ 0,00</span>
         </div>
+        <div style="display:flex;justify-content:space-between;font-size:14px;margin-bottom:4px">
+          <span style="color:var(--txt2)">🟡 A pagar (não vencidas)</span>
+          <span id="d-desp-apagar" style="font-weight:800;color:var(--amber)">R$ 0,00</span>
+        </div>
         <div style="display:flex;justify-content:space-between;font-size:14px;margin-bottom:8px">
-          <span style="color:var(--txt2)">Despesas pendentes</span>
-          <span id="d-desp-pend" style="font-weight:800;color:var(--amber)">R$ 0,00</span>
+          <span style="color:var(--txt2)">🔴 Pendentes (vencidas)</span>
+          <span id="d-desp-pend" style="font-weight:800;color:var(--red)">R$ 0,00</span>
         </div>
         <div class="divider"></div>
         <div style="display:flex;justify-content:space-between;font-size:15px">
@@ -320,9 +336,9 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       <!-- Status filter chips -->
       <div class="filter-chips">
         <div class="chip active" id="chip-todas" onclick="setDespFilter('todas',this)">Todas</div>
-        <div class="chip chip-pendente" id="chip-pendente" onclick="setDespFilter('pendente',this)">🔴 A Pagar</div>
+        <div class="chip chip-vencida" id="chip-vencida" onclick="setDespFilter('vencida',this)">🔴 Pendentes</div>
+        <div class="chip chip-pendente" id="chip-pendente" onclick="setDespFilter('apagar',this)">🟡 A Pagar</div>
         <div class="chip chip-pago" id="chip-pago" onclick="setDespFilter('pago',this)">🟢 Pagas</div>
-        <div class="chip chip-futuro" id="chip-futuro" onclick="setDespFilter('futuro',this)">🟡 Futuras</div>
       </div>
 
       <!-- Date range filter -->
@@ -597,9 +613,9 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       </div>
       <div class="field"><label>Status</label>
         <select id="d-status">
-          <option value="pendente">🔴 Pendente</option>
+          <option value="pendente">🟡 A Pagar</option>
           <option value="pago">🟢 Pago</option>
-          <option value="futuro">🟡 Futuro</option>
+          <option value="vencida">🔴 Pendente</option>
         </select>
       </div>
     </div>
@@ -917,7 +933,7 @@ function saveDespesa() {
   const origem = document.getElementById('d-origem').value;
   const desc = document.getElementById('d-desc').value.trim();
   const installments = parseInt(document.getElementById('d-parcelas').value)||1;
-  const status = document.getElementById('d-status').value;
+  const status = document.getElementById('d-status').value === 'vencida' ? 'pendente' : document.getElementById('d-status').value;
   const recurring = document.getElementById('d-recorrente').checked;
   const juros = parseFloat(document.getElementById('d-juros').value)||0;
 
@@ -1049,31 +1065,51 @@ function clearRecDateFilter() {
 // ═══════════════════════════════════════════════
 function renderDashboard() {
   const saldo = saldoConta();
-  const comprometido = saldoComprometido();
   const ant = saldoMesAnterior();
 
-  const recList = txOfMonth('receita', curMonth);
-  const despPago = txOfMonth('despesa', curMonth, 'pago');
-  const despPend = txOfMonth('despesa', curMonth, 'pendente');
-  const despFut  = txOfMonth('despesa', curMonth, 'futuro');
-  const recTotal = recList.reduce((a,t)=>a+t.value,0);
-  const pagoTotal = sumT(despPago);
-  const pagarTotal = sumT(despPend);
-  const futTotal = sumT(despFut);
+  // Filtro de data do dashboard
+  const de  = (document.getElementById('dash-de')  || {}).value || '';
+  const ate = (document.getElementById('dash-ate') || {}).value || '';
+  const useFilter = de || ate;
+
+  let baseDespesa = transactions.filter(t=>t.type==='despesa');
+  let baseReceita = transactions.filter(t=>t.type==='receita');
+  if (useFilter) {
+    if (de)  { baseDespesa=baseDespesa.filter(t=>t.date>=de); baseReceita=baseReceita.filter(t=>t.date>=de); }
+    if (ate) { baseDespesa=baseDespesa.filter(t=>t.date<=ate); baseReceita=baseReceita.filter(t=>t.date<=ate); }
+  } else {
+    baseDespesa=baseDespesa.filter(t=>dMonth(t.date)===curMonth&&dYear(t.date)===new Date().getFullYear());
+    baseReceita=baseReceita.filter(t=>dMonth(t.date)===curMonth&&dYear(t.date)===new Date().getFullYear());
+  }
+
+  const todayStr = today();
+  const despPago    = baseDespesa.filter(t=>t.status==='pago');
+  const despVencida = baseDespesa.filter(t=>t.status==='pendente' && t.date < todayStr);
+  const despApagar  = baseDespesa.filter(t=>(t.status==='pendente' && t.date >= todayStr) || t.status==='futuro');
+  const recList     = baseReceita;
+  const recTotal    = recList.reduce((a,t)=>a+t.value,0);
+  const pagoTotal   = sumT(despPago);
+  const vencidaTotal= sumT(despVencida);
+  const apagarTotal = sumT(despApagar);
+
+  // Juros pagas = soma de todos os juros/multas de transações pagas
+  const jurosPagas = despPago.reduce((a,t)=>a+(t.interest||0),0);
 
   setText('d-saldo', fmt(saldo));
   setText('d-saldo-ant', fmt(ant));
   setText('d-pago', fmt(pagoTotal));
   setText('d-pago-ct', `${despPago.length} lançamento(s)`);
-  setText('d-apagar', fmt(pagarTotal));
-  setText('d-apagar-ct', `${despPend.length} lançamento(s)`);
-  setText('d-pendente', fmt(futTotal));
-  setText('d-pendente-ct', `${despFut.length} futuro(s)`);
-  setText('d-comprometido', fmt(comprometido));
+  setText('d-apagar', fmt(apagarTotal));
+  setText('d-apagar-ct', `${despApagar.length} conta(s)`);
+  setText('d-pendente', fmt(vencidaTotal));
+  setText('d-pendente-ct', `${despVencida.length} vencida(s)`);
+  setText('d-comprometido', fmt(jurosPagas));
+  setText('d-comprometido-ct', jurosPagas > 0 ? `${despPago.filter(t=>(t.interest||0)>0).length} lançamento(s)` : 'Nenhum juros este mês');
   setText('d-mes-label', MONTHS[curMonth]);
   setText('d-rec-mes', fmt(recTotal));
   setText('d-desp-mes', fmt(pagoTotal));
-  setText('d-desp-pend', fmt(pagarTotal+futTotal));
+  setText('d-desp-apagar', fmt(apagarTotal));
+  setText('d-desp-pend', fmt(vencidaTotal));
 
   const salMes = recTotal - pagoTotal;
   const salEl = document.getElementById('d-sal-mes');
@@ -1088,9 +1124,15 @@ function renderDashboard() {
     ab.classList.remove('show');
   }
 
-  // Category bars
-  renderBarSet('d-cat-bars', txOfMonth('despesa',curMonth), 'category');
-  renderBarSet('d-pgto-bars', txOfMonth('despesa',curMonth), 'origin');
+  // Category bars — usa a lista filtrada
+  renderBarSet('d-cat-bars', baseDespesa, 'category');
+  renderBarSet('d-pgto-bars', baseDespesa, 'origin');
+}
+
+function clearDashFilter() {
+  document.getElementById('dash-de').value='';
+  document.getElementById('dash-ate').value='';
+  renderDashboard();
 }
 
 function renderBarSet(elId, list, key) {
@@ -1125,7 +1167,16 @@ function renderDespList() {
     if (de) list = list.filter(t=>t.date>=de);
     if (ate) list = list.filter(t=>t.date<=ate);
   }
-  if (despFilter!=='todas') list = list.filter(t=>t.status===despFilter);
+  const todayStr = today();
+  if (despFilter==='vencida') {
+    list = list.filter(t=>t.status==='pendente' && t.date < todayStr);
+  } else if (despFilter==='apagar') {
+    list = list.filter(t=>(t.status==='pendente' && t.date >= todayStr) || t.status==='futuro');
+  } else if (despFilter==='pendente+futuro') {
+    list = list.filter(t=>t.status==='pendente'||t.status==='futuro');
+  } else if (despFilter!=='todas') {
+    list = list.filter(t=>t.status===despFilter);
+  }
   list.sort((a,b)=>b.date.localeCompare(a.date));
 
   setText('desp-titulo','Despesas — '+MONTHS[curMonth]);
@@ -1138,25 +1189,29 @@ function renderDespList() {
     const rb = t.recurring?`<span class="pill pill-rec">Rec</span>`:'';
     const ib = (t.interest||0)>0?`<span class="pill pill-int">+${fmt(t.interest)} juros</span>`:'';
     const tv = t.value+(t.interest||0);
-    const stLabel = t.status==='pago'?'Pago':t.status==='pendente'?'A pagar':'Futuro';
+    const isVencida = t.status==='pendente' && t.date < todayStr;
+    const stripeClass = t.status==='pago' ? 'stripe-pago' : t.status==='futuro' ? 'stripe-futuro' : isVencida ? 'stripe-vencida' : 'stripe-pendente';
+    const badgeClass  = t.status==='pago' ? 'badge-pago'  : t.status==='futuro' ? 'badge-futuro'  : isVencida ? 'badge-vencida'  : 'badge-pendente';
+    const stLabel     = t.status==='pago' ? 'Pago' : t.status==='futuro' ? 'Futuro' : isVencida ? 'Vencida' : 'A Pagar';
+    const valColor    = t.status==='pago' ? 'green' : isVencida ? 'red' : 'amber';
     let actionBtn='';
     if (t.status==='pendente'||t.status==='futuro') {
       actionBtn=`<button class="btn-icon" onclick="openPagar('${t.id}')" title="Marcar pago" style="color:var(--green)"><i class="ti ti-check"></i></button>`;
     } else {
       actionBtn=`<button class="btn-icon" onclick="marcarPendente('${t.id}')" title="Desfazer pagamento" style="color:var(--amber)"><i class="ti ti-arrow-back-up"></i></button>`;
     }
-    return `<div class="item-row stripe-${t.status}">
+    return `<div class="item-row ${stripeClass}">
       <div class="item-left">
         <div class="item-name">${t.category}${pb}${rb}</div>
         ${t.description?`<div class="item-desc">${t.description}</div>`:''}
         <div class="item-sub">
-          <span class="badge badge-${t.status}">${stLabel}</span>
+          <span class="badge ${badgeClass}">${stLabel}</span>
           <span>${t.origin}</span>
           <span>${d}</span>${ib}
         </div>
       </div>
       <div class="item-actions">
-        <div class="item-val ${t.status==='pago'?'green':t.status==='pendente'?'red':'amber'}">${fmt(tv)}</div>
+        <div class="item-val ${valColor}">${fmt(tv)}</div>
         <div class="act-row">
           ${actionBtn}
           <button class="btn-icon" onclick="openEditDesp('${t.id}')" style="color:var(--blue)"><i class="ti ti-pencil"></i></button>
@@ -1227,15 +1282,40 @@ function renderCadSub(idx) {
   }
 }
 
-function renderCatList(elId, arr, removeFn) {
+function renderCatList(elId, arr, removeFn, saveFn) {
   const el = document.getElementById(elId);
   if (!el) return;
   el.innerHTML = arr.length
-    ? arr.map((t,i)=>`<div class="cat-item"><span class="cat-item-name">${t}</span><button class="btn-icon" onclick="${removeFn}(${i})" style="color:var(--red)"><i class="ti ti-trash"></i></button></div>`).join('')
+    ? arr.map((t,i)=>`
+      <div class="cat-item" id="catrow-${elId}-${i}">
+        <span class="cat-item-name" id="catname-${elId}-${i}">${t}</span>
+        <input class="cat-item-input" id="catinput-${elId}-${i}" value="${t}" style="display:none;flex:1;font-size:15px;font-weight:600;border:.5px solid var(--border);border-radius:8px;padding:4px 8px;background:var(--bg2);color:var(--txt1)"/>
+        <div style="display:flex;gap:2px;align-items:center">
+          <button class="btn-icon" id="catedit-${elId}-${i}" onclick="startEditCat('${elId}',${i},'${saveFn}')" style="color:var(--blue)" title="Editar"><i class="ti ti-pencil"></i></button>
+          <button class="btn-icon" id="catsave-${elId}-${i}" onclick="saveEditCat('${elId}',${i},'${saveFn}')" style="color:var(--green);display:none" title="Salvar"><i class="ti ti-check"></i></button>
+          <button class="btn-icon" onclick="${removeFn}(${i})" style="color:var(--red)" title="Excluir"><i class="ti ti-trash"></i></button>
+        </div>
+      </div>`).join('')
     : '<p class="empty">Nenhum cadastro.</p>';
 }
 
-function renderTiposDesp() { renderCatList('lista-tipos-desp', config.tiposDespesa, 'removeTipoDesp'); }
+function startEditCat(elId, i, saveFn) {
+  document.getElementById(`catname-${elId}-${i}`).style.display='none';
+  document.getElementById(`catinput-${elId}-${i}`).style.display='';
+  document.getElementById(`catedit-${elId}-${i}`).style.display='none';
+  document.getElementById(`catsave-${elId}-${i}`).style.display='';
+  document.getElementById(`catinput-${elId}-${i}`).focus();
+}
+
+function saveEditCat(elId, i, saveFn) {
+  const val = document.getElementById(`catinput-${elId}-${i}`).value.trim();
+  if (!val) return;
+  if (saveFn==='saveTipoDesp')  { config.tiposDespesa[i]=val; saveData(); renderTiposDesp(); }
+  else if (saveFn==='saveOrigem') { config.origensPagemento[i]=val; saveData(); renderOrigens(); }
+  else if (saveFn==='saveTipoRec') { config.tiposReceita[i]=val; saveData(); renderTiposRec(); }
+}
+
+function renderTiposDesp() { renderCatList('lista-tipos-desp', config.tiposDespesa, 'removeTipoDesp', 'saveTipoDesp'); }
 function addTipoDesp() {
   const v = document.getElementById('novo-tipo-desp').value.trim();
   if (!v||config.tiposDespesa.includes(v)) return;
@@ -1244,7 +1324,7 @@ function addTipoDesp() {
 }
 function removeTipoDesp(i) { config.tiposDespesa.splice(i,1); saveData(); renderTiposDesp(); }
 
-function renderOrigens() { renderCatList('lista-origens', config.origensPagemento, 'removeOrigem'); }
+function renderOrigens() { renderCatList('lista-origens', config.origensPagemento, 'removeOrigem', 'saveOrigem'); }
 function addOrigem() {
   const v = document.getElementById('novo-origem').value.trim();
   if (!v||config.origensPagemento.includes(v)) return;
@@ -1253,7 +1333,7 @@ function addOrigem() {
 }
 function removeOrigem(i) { config.origensPagemento.splice(i,1); saveData(); renderOrigens(); }
 
-function renderTiposRec() { renderCatList('lista-tipos-rec', config.tiposReceita, 'removeTipoRec'); }
+function renderTiposRec() { renderCatList('lista-tipos-rec', config.tiposReceita, 'removeTipoRec', 'saveTipoRec'); }
 function addTipoRec() {
   const v = document.getElementById('novo-tipo-rec').value.trim();
   if (!v||config.tiposReceita.includes(v)) return;
